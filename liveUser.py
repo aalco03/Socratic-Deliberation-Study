@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, jsonify, session
 from flask_session import Session
 from openai import OpenAI
 import os
+import random
 from datetime import datetime
 from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
@@ -25,6 +26,23 @@ Session(app)
 conversational_model = "gpt-3.5-turbo"
 expert_model = "gpt-4"
 
+PRAGMA_DIALECTICAL_EXPERT_PROMPT = """
+    You will be collaborating with another distinctly trained Large Language Model, with the goal of helping a user better form their arguments and understand their own position on controversial topics in public policy. 
+    Your main task is to observe the arguments presented by the user, and using the Pragma-Dialectical Model, analyze whether the argument is strong. 
+    If you believe that it is insufficient, list specifically what the argument is lacking, and how to further improve it based on the principles of the Pragma-Dialectical Model by Frans H. van Eemeren and Rob Grootendorst.
+    You may make suggestions to the other LLM for further questioning or redirecting the conversation. At the end of your analysis, give a sentence-long, concise, easily implementable piece of advice to the conversational LLM.
+    Keep your response to around 100 words, and please format your response in this way:
+    1. Analysis:
+    2. Concise Advice:
+    """
+GRAMMAR_EXPERT_PROMPT = """
+    You will be collaborating with another distinctly trained Large Language Model, with the goal of helping a user better form their arguments and understand their own position on controversial topics in public policy. 
+    Your main task is to observe the arguments presented by the user, and assess its quality basing your analysis prioritizing the grammar of the argument.
+    If you believe an argument has poor grammar, list what the issue is, and focus on correcting it. At the end of your analysis, give a sentence-long, concise, easily implementable piece of advice to the conversational LLM.
+    Keep your response to around 100 words, and please format your response in this way:
+    1. Analysis:
+    2. Concise Advice:
+"""
 conversation_log = ""
 round_count = 0
 max_rounds = 5
@@ -43,14 +61,20 @@ drive = setup_google_drive()
 
 # Function to handle interaction with the Expert LLM
 def expert_llm(conversation_log):
+
+    assigned_llm = session.get("assigned_expert_llm")
+
+    # Use the corresponding system prompt
+    if assigned_llm == "pragma_dialectical":
+        system_prompt = PRAGMA_DIALECTICAL_EXPERT_PROMPT
+    elif assigned_llm == "grammar":
+        system_prompt = GRAMMAR_EXPERT_PROMPT
+    else:
+        return "Error: No Expert LLM assigned."
+
     expert_prompt = f"""
-    You will be collaborating with another distinctly trained Large Language Model, with the goal of helping a user better form their arguments and understand their own position on controversial topics in public policy. 
-    Your main task is to observe the arguments presented by the user, and using the Pragma-Dialectical Model, analyze whether the argument is strong. 
-    If you believe that it is insufficient, list specifically what the argument is lacking, and how to further improve it.
-    You may make suggestions to the other LLM for further questioning or redirecting the conversation. At the end of your analysis, give a sentence-long, concise, easily implementable piece of advice to the conversational LLM.
-    Keep your response to around 100 words, and please format your response in this way:
-    1. Analysis:
-    2. Concise Advice:
+    {system_prompt}
+
     Here is the conversation log for your analysis:
     {conversation_log}
     """
@@ -116,8 +140,9 @@ def save_conversation_log(conversation_log):
     try:
         # Create a timestamped filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"conversation_log_{timestamp}.txt"
-        
+        assigned_expert_llm = session.get("assigned_expert_llm", "unknown_expert")
+        filename = f"conversation_log_{assigned_expert_llm}_{timestamp}.txt"
+
         # Save the conversation log to a local file
         with open(filename, "w") as f:
             f.write(conversation_log)
@@ -134,6 +159,7 @@ def index():
     session.clear()
     session['conversation_log'] = ""
     session['round_count'] = 0
+    session['assigned_expert_llm'] = random.choice(["pragma_dialectical", "grammar"])
     return render_template('UI.html')
 
 @app.route('/chat', methods=['POST'])
