@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Socratic Deliberation Study</title>
+    <style>
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #f9f9f9;
+            margin: 0;
+            padding: 0;
+        }
+        .header {
+            text-align: center;
+            padding: 20px;
+            background-color: #4a90e2;
+            color: white;
+        }
+        .chat-container {
+            width: 60%;
+            margin: 40px auto;
+            border: 2px solid #ccc;
+            border-radius: 10px;
+            background-color: white;
+            padding: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        .chat-box {
+            height: 400px;
+            border: 2px solid #d3d3d3;
+            background-color: #f4f4f4;
+            padding: 15px;
+            overflow-y: scroll;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+        .chat-input {
+            width: calc(100% - 22px);
+            padding: 10px;
+            border: 2px solid #d3d3d3;
+            border-radius: 5px;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        .chat-button {
+            padding: 10px 20px;
+            margin-top: 10px;
+            cursor: pointer;
+            background-color: #4a90e2;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        .chat-message {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+        .user, .llm {
+            margin-left: 10px;
+            max-width: 75%;
+            word-wrap: break-word;
+        }
+        .user img, .llm img {
+            width: 40px;
+            height: 40px;
+            margin-right: 10px;
+            object-fit: contain; 
+            border-radius: 50%; 
+        }
+        .user {
+            color: blue;
+            font-weight: bold;
+        }
+        .llm {
+            color: green;
+            font-weight: bold;
+        }
+        .footer {
+            text-align: center;
+            padding: 20px;
+            margin-top: 20px;
+            background-color: #f4f4f4;
+        }
+        .footer img {
+            height: 50px;
+            margin: 0 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Socratic Deliberation Study</h1>
+    </div>
+
+    <div class="chat-container">
+        <div class="chat-box" id="chat-box">
+            <!-- Messages will appear here -->
+        </div>
+        <textarea id="chat-input" class="chat-input" placeholder="Present a political viewpoint..."></textarea>
+        <button id="chat-button" class="chat-button">Send</button>
+    </div>
+
+    <div class="footer">
+        <img src="/static/StanfordDELLogoPNG.png" alt="Stanford DEL Logo">
+        <img src="/static/StanfordHAILogoPNG.png" alt="Stanford HAI Logo">
+    </div>
+
+    <script>
+        const chatBox = document.getElementById('chat-box');
+        const chatInput = document.getElementById('chat-input');
+        const chatButton = document.getElementById('chat-button');
+
+        // Function to add messages to the chat box
+        function addMessageToChat(role, message, className, image) {
+            const chatMessage = document.createElement('div');
+            chatMessage.className = 'chat-message ' + className;
+
+            const img = document.createElement('img');
+            img.src = image;
+            img.alt = `${role} Icon`;
+
+            const text = document.createElement('div');
+            text.innerHTML = `<strong>${role}:</strong> ${message}`;
+            text.className = className;
+
+            chatMessage.appendChild(img);
+            chatMessage.appendChild(text);
+
+            chatBox.appendChild(chatMessage);
+            chatBox.scrollTop = chatBox.scrollHeight; // Auto-scroll
+        }
+
+        window.onload = () => {
+            addMessageToChat('System', 'Welcome to our study, please present a political stance on a subject of your choosing.', 'llm', '/static/SystemIconPNG.png');
+        };
+
+
+        chatButton.addEventListener('click', async () => {
+            const userMessage = chatInput.value;
+            if (userMessage.trim() === '') return;
+
+            // Display user message
+            addMessageToChat('User', userMessage, 'user', '/static/FinalUserIconPNG.png');
+            chatInput.value = '';
+
+            // Send message to the Flask backend
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ message: userMessage })
+            });
+
+            const result = await response.json();
+
+            // Display response from Conversational LLM
+            addMessageToChat('Bot-crates', result.message, 'llm', '/static/Bot-crates.png');
+
+            // If the study is over, disable input and button
+            if (result.message.includes("Thank you for participating")) {
+                chatInput.disabled = true;
+                chatButton.disabled = true;
+            }
+        });
+    </script>
+</body>
+</html>

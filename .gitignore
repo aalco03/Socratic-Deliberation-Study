@@ -1,0 +1,7 @@
+*.DS_Store
+~/Library/
+__pycache__/
+*.log
+deliberation_transcripts_ToulminModel/
+deliberation_transcripts_PDModel/
+
