@@ -1,14 +1,25 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, session
+from flask_session import Session
 from openai import OpenAI
 import os
 from datetime import datetime
 from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
 from pydrive2.auth import ServiceAccountCredentials
+from dotenv import load_dotenv
 
-client = OpenAI(api_key='***REMOVED***')
+load_dotenv()
+
+api_key = os.getenv('OPENAI_API_KEY')
+if not api_key:
+    raise ValueError("OPENAI_API_KEY environment variable is not set. Please configure it.")
+client = OpenAI(api_key=api_key)
 
 app = Flask(__name__)
+app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev123')
+
+app .config['SESSION_TYPE'] = 'filesystem'
+Session(app)
 
 # LLM models
 conversational_model = "gpt-3.5-turbo"
@@ -101,10 +112,6 @@ def upload_to_google_drive(filepath):
     except Exception as e:
         print(f"Error uploading to Google Drive: {e}")
 
-@app.route('/')
-def index():
-    return render_template('UI.html')
-
 def save_conversation_log(conversation_log):
     try:
         # Create a timestamped filename
@@ -122,33 +129,36 @@ def save_conversation_log(conversation_log):
     except Exception as e:
         print(f"Error saving conversation log: {e}")
 
+@app.route('/')
+def index():
+    session.clear()
+    session['conversation_log'] = ""
+    session['round_count'] = 0
+    return render_template('UI.html')
+
 @app.route('/chat', methods=['POST'])
 def chat():
-    global conversation_log, round_count
+    if 'conversation_log' not in session:
+        session['conversation_log'] = ""
+    if 'round_count' not in session:
+        session['round_count'] = 0
 
-    # Get user input
     user_input = request.json['message']
+    session['conversation_log'] += f"User: {user_input}\n"
 
-    # Log user input
-    conversation_log += f"User: {user_input}\n"
+    expert_advice = expert_llm(session['conversation_log'])
+    session['conversation_log'] += f"Expert LLM: {expert_advice}\n"
 
-    # Process through Expert LLM (but don't include its output in the response)
-    expert_advice = expert_llm(conversation_log)
-    conversation_log += f"Expert LLM: {expert_advice}\n"
-
-    # Process through Conversational LLM
     conversational_response = conversational_llm(user_input, expert_advice)
-    conversation_log += f"Conversational LLM: {conversational_response}\n\n"
+    session['conversation_log'] += f"Conversational LLM: {conversational_response}\n\n"
 
-    # Increment round counter
-    round_count += 1
+    session['round_count'] += 1
 
-    # Check if the maximum number of rounds has been reached
-    if round_count >= max_rounds:
-        save_conversation_log(conversation_log)  # Save the log to Google Drive
+    if session['round_count'] >= max_rounds:
+        save_conversation_log(session['conversation_log'])
+        session.clear()
         return jsonify({"message": "Thank you for participating in our study."})
 
-    # Return only the conversational LLM's response
     return jsonify({"message": conversational_response})
 
 

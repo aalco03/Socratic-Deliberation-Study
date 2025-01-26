@@ -31,6 +31,7 @@ distro==1.9.0
 Django==5.1
 executing==2.1.0
 Flask==3.0.3
+Flask_Session
 flatbuffers==24.3.25
 fonttools==4.53.1
 frozenlist==1.4.1
@@ -112,6 +113,7 @@ pyOpenSSL==24.2.1
 pyparsing==3.1.2
 PySocks==1.7.1
 python-dateutil==2.9.0.post0
+python-dotenv
 pytz==2024.2
 PyYAML==6.0.2
 pyzmq==26.2.0
