@@ -154,6 +154,28 @@ def save_conversation_log(conversation_log):
     except Exception as e:
         print(f"Error saving conversation log: {e}")
 
+def save_arguments_log(user_arguments):
+    try:
+        # Create a timestamped filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        assigned_expert_llm = session.get("assigned_expert_llm", "unknown_expert")
+        filename = f"arguments_log_{assigned_expert_llm}_{timestamp}.txt"
+
+        # Save the user arguments to a local file
+        with open(filename, "w") as f:
+            f.write(user_arguments)
+        
+        # Upload the file to a specific folder in Google Drive
+        folder_id = "1X-wyzGN8sCMMUKwX-FliMeay5P9nzvLZ"  # Replace with your folder ID
+        file_to_upload = drive.CreateFile({'title': os.path.basename(filename), 'parents': [{'id': folder_id}]})
+        file_to_upload.SetContentFile(filename)
+        file_to_upload.Upload()
+        print(f"Arguments log uploaded: {filename}")
+        os.remove(filename)  # Delete local file after upload
+    except Exception as e:
+        print(f"Error saving arguments log: {e}")
+
+
 @app.route('/')
 def index():
     session.clear()
@@ -166,11 +188,17 @@ def index():
 def chat():
     if 'conversation_log' not in session:
         session['conversation_log'] = ""
+    if 'user_arguments' not in session:
+        session['user_arguments'] = ""
     if 'round_count' not in session:
         session['round_count'] = 0
+    if 'argument_count' not in session:
+        session['argument_count'] = 1
 
     user_input = request.json['message']
     session['conversation_log'] += f"User: {user_input}\n"
+    session['user_arguments'] += f"{session['argument_count']}. {user_input}\n"
+    session['argument_count'] += 1
 
     expert_advice = expert_llm(session['conversation_log'])
     session['conversation_log'] += f"Expert LLM: {expert_advice}\n"
@@ -182,6 +210,7 @@ def chat():
 
     if session['round_count'] >= max_rounds:
         save_conversation_log(session['conversation_log'])
+        save_arguments_log(session['user_arguments']) 
         session.clear()
         return jsonify({"message": "Thank you for participating in our study."})
 
