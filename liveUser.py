@@ -43,9 +43,6 @@ GRAMMAR_EXPERT_PROMPT = """
     1. Analysis:
     2. Concise Advice:
 """
-conversation_log = ""
-round_count = 0
-max_rounds = 5
 
 def setup_google_drive():
     service_account_file = "socraticDeliberationServiceKey.json"
@@ -65,12 +62,7 @@ def expert_llm(conversation_log):
     assigned_llm = session.get("assigned_expert_llm")
 
     # Use the corresponding system prompt
-    if assigned_llm == "pragma_dialectical":
-        system_prompt = PRAGMA_DIALECTICAL_EXPERT_PROMPT
-    elif assigned_llm == "grammar":
-        system_prompt = GRAMMAR_EXPERT_PROMPT
-    else:
-        return "Error: No Expert LLM assigned."
+    system_prompt = PRAGMA_DIALECTICAL_EXPERT_PROMPT if assigned_llm == "pragma_dialectical" else GRAMMAR_EXPERT_PROMPT
 
     expert_prompt = f"""
     {system_prompt}
@@ -92,26 +84,34 @@ def expert_llm(conversation_log):
 
 # Function to handle interaction with the Conversational LLM
 def conversational_llm(prompt, expert_advice):
-    socratic_prompt = f"""
-    Focus all actions and responses on addressing the user's specific needs, goals, and preferences. 
-    Employ active listening techniques to understand the user's intent and desired outcome from each interaction. 
-    Prioritize tasks and requests that benefit the user and contribute to their overall well-being. 
-    Respect user autonomy and allow users to make informed decisions about their interactions with the system.
-    In the context of a Socratic dialogue on a given topic, You are tasked with deepening the user's examination of their beliefs on the topic at hand. 
-    Heavily consider the following advice from an expert LLM, to help inform the question which you will ask the user: "{expert_advice}".
-    Your question should probe deeply into the user's argument, aimed at revealing the underlying layers of thought, assumption, and belief.
-    This is about facilitating a moment of genuine introspection and potentially transforming the user's understanding of their stance.
-    This involves not just listening but hearing, not just asking but probing. The conversation should be guided towards achieving profound clarity. 
-    Your follow-up question should be incisive, compelling the user to delve deeper into their argument.
+    assigned_llm = session.get("assigned_expert_llm")
+    if assigned_llm == "pragma_dialectical":
+        socratic_prompt = f"""
+        Focus all actions and responses on addressing the user's specific needs, goals, and preferences. 
+        Employ active listening techniques to understand the user's intent and desired outcome from each interaction. 
+        Prioritize tasks and requests that benefit the user and contribute to their overall well-being. 
+        Respect user autonomy and allow users to make informed decisions about their interactions with the system.
+        In the context of a Socratic dialogue on a given topic, You are tasked with deepening the user's examination of their beliefs on the topic at hand. 
+        Heavily consider the following advice from an expert LLM, to help inform the question which you will ask the user: "{expert_advice}"
+        Your question should probe deeply into the user's argument, aimed at revealing the underlying layers of thought, assumption, and belief.
+        This is about facilitating a moment of genuine introspection and potentially transforming the user's understanding of their stance.
+        This involves not just listening but hearing, not just asking but probing. The conversation should be guided towards achieving profound clarity. 
+        Your follow-up question should be incisive, compelling the user to delve deeper into their argument.
 
-    Your response must:
-    - Be a SINGLE question.
-    - Avoid any additional commentary, elaboration, or compound questions.
-    - Be concise and directly related to the user's argument.
+        Your response must:
+        - Be a SINGLE question.
+        - Avoid any additional commentary, elaboration, or compound questions.
+        - Be concise and directly related to the user's argument.
 
-    Failure to adhere to this format will result in an incomplete conversation. Ensure your response is a single, incisive PROBING question that encourages the user to think more deeply about their argument.
-    Use as reference a data set of typical questions asked in a socratic dialogue.
-    """
+        Failure to adhere to this format will result in an incomplete conversation. Ensure your response is a single, incisive PROBING question that encourages the user to think more deeply about their argument.
+        Use as reference a data set of typical questions asked in a socratic dialogue.
+        """
+    else:  # Grammar expert case
+        socratic_prompt = f"""
+        Use the expert analysis to help the user format his argument grammatically. Focus on actionable implementation. Here is the expert analysis: "{expert_advice}"
+        """
+
+
     try:
         response = client.chat.completions.create(
             model=conversational_model,
@@ -166,7 +166,7 @@ def save_arguments_log(user_arguments):
             f.write(user_arguments)
         
         # Upload the file to a specific folder in Google Drive
-        folder_id = "1X-wyzGN8sCMMUKwX-FliMeay5P9nzvLZ"  # Replace with your folder ID
+        folder_id = "1X-wyzGN8sCMMUKwX-FliMeay5P9nzvLZ" 
         file_to_upload = drive.CreateFile({'title': os.path.basename(filename), 'parents': [{'id': folder_id}]})
         file_to_upload.SetContentFile(filename)
         file_to_upload.Upload()
@@ -180,20 +180,29 @@ def save_arguments_log(user_arguments):
 def index():
     session.clear()
     session['conversation_log'] = ""
+    session['user_arguments'] = ""
     session['round_count'] = 0
+    session['argument_count'] = 1
     session['assigned_expert_llm'] = random.choice(["pragma_dialectical", "grammar"])
+    session['max_rounds'] = 5 if session['assigned_expert_llm'] == "pragma_dialectical" else 2  # Reduced rounds for grammar expert
+    session['post_study_response'] = False  # Control system for post-study response
     return render_template('UI.html')
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    if 'conversation_log' not in session:
-        session['conversation_log'] = ""
-    if 'user_arguments' not in session:
-        session['user_arguments'] = ""
-    if 'round_count' not in session:
-        session['round_count'] = 0
-    if 'argument_count' not in session:
-        session['argument_count'] = 1
+    # Check if the user is in the post-study response phase
+    if session.get('post_study_response', False):
+        user_response = request.json['message']
+        session['conversation_log'] += f"User Post-Study Response: {user_response}\n"
+        session['user_arguments'] += f"Final Response: {user_response}\n"
+        
+        # Save final logs
+        save_conversation_log(session['conversation_log'])
+        save_arguments_log(session['user_arguments'])
+
+        # Clear session and return system message instead of LLM message
+        session.clear()
+        return jsonify({"system_message": "Thank you for your response. The study is now complete.", "end_study": True})
 
     user_input = request.json['message']
     session['conversation_log'] += f"User: {user_input}\n"
@@ -208,14 +217,12 @@ def chat():
 
     session['round_count'] += 1
 
-    if session['round_count'] >= max_rounds:
-        save_conversation_log(session['conversation_log'])
-        save_arguments_log(session['user_arguments']) 
-        session.clear()
-        return jsonify({"message": "Thank you for participating in our study."})
+    # Check if this was the final round
+    if session['round_count'] >= session['max_rounds']:
+        session['post_study_response'] = True
+        return jsonify({"message": "Thank you for participating in our study.", "system_prompt": "Again, please respond to the prompt above as best as you can."})
 
     return jsonify({"message": conversational_response})
-
 
 if __name__ == '__main__':
     app.run(debug=True)

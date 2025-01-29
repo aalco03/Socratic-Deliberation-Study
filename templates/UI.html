@@ -141,26 +141,34 @@
             const userMessage = chatInput.value;
             if (userMessage.trim() === '') return;
 
-            // Display user message
             addMessageToChat('User', userMessage, 'user', '/static/FinalUserIconPNG.png');
             chatInput.value = '';
 
-            // Send message to the Flask backend
             const response = await fetch('/chat', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: userMessage })
             });
 
             const result = await response.json();
 
-            // Display response from Conversational LLM
-            addMessageToChat('Bot-crates', result.message, 'llm', '/static/Bot-crates.png');
+            // Show response from Conversational LLM
+            if (result.message) {
+                addMessageToChat('Bot-crates', result.message, 'llm', '/static/Bot-crates.png');
+            }
 
-            // If the study is over, disable input and button
-            if (result.message.includes("Thank you for participating")) {
+            // Handle the final system prompt
+            if (result.system_prompt) {
+                addMessageToChat('System', result.system_prompt, 'llm', '/static/SystemIconPNG.png');
+            }
+
+            // Handle the final system message (instead of the LLM)
+            if (result.system_message) {
+                addMessageToChat('System', result.system_message, 'llm', '/static/SystemIconPNG.png');
+            }
+
+            // Disable input only if the study has completely ended
+            if (result.end_study) {
                 chatInput.disabled = true;
                 chatButton.disabled = true;
             }
