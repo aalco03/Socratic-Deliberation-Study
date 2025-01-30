@@ -283,7 +283,7 @@ def chat():
         else:
             # For pragma-dialectical expert, proceed to post-study response
             session['post_study_response'] = True
-            return jsonify({"message": "Thank you for participating in our study.", "system_prompt": "Again, please respond to the prompt in the site header as best as you can."})
+            return jsonify({"message": "Thank you for participating in our study.", "system_prompt": "To conclude, please respond to the prompt in the site header as best as you can."})
 
     return jsonify({"message": conversational_response})
 
