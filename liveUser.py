@@ -108,7 +108,10 @@ def conversational_llm(prompt, expert_advice):
         """
     else:  # Grammar expert case
         socratic_prompt = f"""
-        Use the expert analysis to help the user format his argument grammatically. Focus on actionable implementation. Here is the expert analysis: "{expert_advice}"
+        Use the expert analysis to help the user format his argument grammatically.
+        Focus on actionable implementation, and propose more grammatically correct, efficient, and concise ways to rephrase their statement.
+        DO NOT MAKE RECOMMENDATIONS on building a stronger argument (its substance), rather only focus on the presentation (making it sound more intelligent and eloquent).
+        Here is the expert analysis: "{expert_advice}"
         """
 
 
@@ -188,6 +191,32 @@ def index():
     session['post_study_response'] = False  # Control system for post-study response
     return render_template('UI.html')
 
+@app.route('/prolific-id', methods=['POST'])
+def prolific_id():
+    prolific_id = request.json['prolific_id']
+    session['prolific_id'] = prolific_id
+    session['conversation_log'] += f"Prolific ID: {prolific_id}\n"
+    session['user_arguments'] += f"Prolific ID: {prolific_id}\n"
+    return jsonify({"status": "success", "next_prompt": "Please begin by typing your response to the prompt above. Make sure to restate the question when responding (i.e. I oppose/support permitting individuals with mental illnesses to...)"})
+
+@app.route('/initial-argument', methods=['POST'])
+def initial_argument():
+    user_input = request.json['message']
+    session['conversation_log'] += f"User: {user_input}\n"
+    session['user_arguments'] += f"{session['argument_count']}. {user_input}\n"
+    session['argument_count'] += 1
+
+    # Directly start the LLM conversation flow
+    expert_advice = expert_llm(session['conversation_log'])
+    session['conversation_log'] += f"Expert LLM: {expert_advice}\n"
+
+    conversational_response = conversational_llm(user_input, expert_advice)
+    session['conversation_log'] += f"Conversational LLM: {conversational_response}\n\n"
+
+    session['round_count'] += 1
+
+    return jsonify({"message": conversational_response})
+
 @app.route('/chat', methods=['POST'])
 def chat():
     # Check if the user is in the post-study response phase
@@ -202,7 +231,7 @@ def chat():
 
         # Clear session and return system message instead of LLM message
         session.clear()
-        return jsonify({"system_message": "Thank you for your response. The study is now complete.", "end_study": True})
+        return jsonify({"system_message": "Thank you for your response. The study is now complete. Your Prolific completion code is C7LJVS5U.", "end_study": True})
 
     user_input = request.json['message']
     session['conversation_log'] += f"User: {user_input}\n"
@@ -220,7 +249,7 @@ def chat():
     # Check if this was the final round
     if session['round_count'] >= session['max_rounds']:
         session['post_study_response'] = True
-        return jsonify({"message": "Thank you for participating in our study.", "system_prompt": "Again, please respond to the prompt above as best as you can."})
+        return jsonify({"message": "Thank you for participating in our study.", "system_prompt": "Again, please respond to the prompt in the site header as best as you can."})
 
     return jsonify({"message": conversational_response})
 

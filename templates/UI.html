@@ -98,7 +98,7 @@
         <div class="chat-box" id="chat-box">
             <!-- Messages will appear here -->
         </div>
-        <textarea id="chat-input" class="chat-input" placeholder="Present a political viewpoint..."></textarea>
+        <textarea id="chat-input" class="chat-input" placeholder="Type your Prolific ID..."></textarea>
         <button id="chat-button" class="chat-button">Send</button>
     </div>
 
@@ -111,6 +111,8 @@
         const chatBox = document.getElementById('chat-box');
         const chatInput = document.getElementById('chat-input');
         const chatButton = document.getElementById('chat-button');
+
+        let currentStep = 'prolific-id';
 
         // Function to add messages to the chat box
         function addMessageToChat(role, message, className, image) {
@@ -133,7 +135,7 @@
         }
 
         window.onload = () => {
-            addMessageToChat('System', 'Please begin by typing your response to the prompt above. Make sure to restate the question when responding (i.e. I oppose/support permitting individuals with mental illnesses to...).', 'llm', '/static/SystemIconPNG.png');
+            addMessageToChat('System', 'Before we begin, please type in your Prolific ID.', 'llm', '/static/SystemIconPNG.png');
         };
 
 
@@ -144,33 +146,60 @@
             addMessageToChat('User', userMessage, 'user', '/static/FinalUserIconPNG.png');
             chatInput.value = '';
 
-            const response = await fetch('/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: userMessage })
-            });
+            if (currentStep === 'prolific-id') {
+                const response = await fetch('/prolific-id', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prolific_id: userMessage })
+                });
 
-            const result = await response.json();
+                const result = await response.json();
+                if (result.status === 'success') {
+                    currentStep = 'initial-argument';
+                    addMessageToChat('System', result.next_prompt, 'llm', '/static/SystemIconPNG.png');
+                    chatInput.placeholder = "Present a political viewpoint...";
+                }
+            } else if (currentStep === 'initial-argument') {
+                const response = await fetch('/initial-argument', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: userMessage })
+                });
 
-            // Show response from Conversational LLM
-            if (result.message) {
-                addMessageToChat('Bot-crates', result.message, 'llm', '/static/Bot-crates.png');
-            }
+                const result = await response.json();
+                if (result.message) {
+                    currentStep = 'chat';
+                    addMessageToChat('Bot-crates', result.message, 'llm', '/static/Bot-crates.png');
+                }
+            } else if (currentStep === 'chat') {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: userMessage })
+                });
 
-            // Handle the final system prompt
-            if (result.system_prompt) {
-                addMessageToChat('System', result.system_prompt, 'llm', '/static/SystemIconPNG.png');
-            }
+                const result = await response.json();
 
-            // Handle the final system message (instead of the LLM)
-            if (result.system_message) {
-                addMessageToChat('System', result.system_message, 'llm', '/static/SystemIconPNG.png');
-            }
+                // Show response from Conversational LLM
+                if (result.message) {
+                    addMessageToChat('Bot-crates', result.message, 'llm', '/static/Bot-crates.png');
+                }
 
-            // Disable input only if the study has completely ended
-            if (result.end_study) {
-                chatInput.disabled = true;
-                chatButton.disabled = true;
+                // Handle the final system prompt
+                if (result.system_prompt) {
+                    addMessageToChat('System', result.system_prompt, 'llm', '/static/SystemIconPNG.png');
+                }
+
+                // Handle the final system message (instead of the LLM)
+                if (result.system_message) {
+                    addMessageToChat('System', result.system_message, 'llm', '/static/SystemIconPNG.png');
+                }
+
+                // Disable input only if the study has completely ended
+                if (result.end_study) {
+                    chatInput.disabled = true;
+                    chatButton.disabled = true;
+                }
             }
         });
     </script>
