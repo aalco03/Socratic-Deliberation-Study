@@ -185,23 +185,19 @@
                     addMessageToChat('Bot-crates', result.message, 'llm', '/static/Bot-crates.png');
                 }
 
+                // Handle the final system message (instead of the LLM)
+                if (result.system_message) {
+                    addMessageToChat('System', result.system_message, 'llm', '/static/SystemIconPNG.png');
+                    chatInput.disabled = true;
+                    chatButton.disabled = true;
+                }
+
                 // Handle the final system prompt
                 if (result.system_prompt) {
                     addMessageToChat('System', result.system_prompt, 'llm', '/static/SystemIconPNG.png');
                 }
-
-                // Handle the final system message (instead of the LLM)
-                if (result.system_message) {
-                    addMessageToChat('System', result.system_message, 'llm', '/static/SystemIconPNG.png');
-                }
-
-                // Disable input only if the study has completely ended
-                if (result.end_study) {
-                    chatInput.disabled = true;
-                    chatButton.disabled = true;
-                }
             }
         });
-    </script>
+        </script>
 </body>
 </html>
