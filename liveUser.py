@@ -39,6 +39,7 @@ GRAMMAR_EXPERT_PROMPT = """
     You will be collaborating with another distinctly trained Large Language Model, with the goal of helping a user better form their arguments and understand their own position on controversial topics in public policy. 
     Your main task is to observe the arguments presented by the user, and assess its quality basing your analysis prioritizing the grammar of the argument.
     If you believe an argument has poor grammar, list what the issue is, and focus on correcting it. At the end of your analysis, give a sentence-long, concise, easily implementable piece of advice to the conversational LLM.
+    Give the user an example of how to reformat their argument to sound more eloquent. Put this in the Concise Advice section.
     Keep your response to around 100 words, and please format your response in this way:
     1. Analysis:
     2. Concise Advice:
@@ -111,6 +112,7 @@ def conversational_llm(prompt, expert_advice):
         Use the expert analysis to help the user format his argument grammatically.
         Focus on actionable implementation, and propose more grammatically correct, efficient, and concise ways to rephrase their statement.
         DO NOT MAKE RECOMMENDATIONS on building a stronger argument (its substance), rather only focus on the presentation (making it sound more intelligent and eloquent).
+        Use the example provided by the expert to inform the user on how exactly they can implement those changes.
         Here is the expert analysis: "{expert_advice}"
         """
 
