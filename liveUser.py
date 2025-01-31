@@ -19,7 +19,7 @@ client = OpenAI(api_key=api_key)
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev123')
 
-app .config['SESSION_TYPE'] = 'filesystem'
+app.config['SESSION_TYPE'] = 'filesystem'
 Session(app)
 
 # LLM models
@@ -36,7 +36,8 @@ PRAGMA_DIALECTICAL_EXPERT_PROMPT = """
     Keep your response to around 100 words, and please format your response in this way:
     1. Analysis:
     2. Concise Advice:
-    """
+"""
+
 GRAMMAR_EXPERT_PROMPT = """
     You will be collaborating with another distinctly trained Large Language Model, with the goal of helping a user better form their arguments and understand their own position on controversial topics in public policy. 
     Your main task is to observe the arguments presented by the user, and assess its quality basing your analysis prioritizing the grammar of the argument.
@@ -62,14 +63,13 @@ def setup_google_drive():
 
 drive = setup_google_drive()
 
-# Function to handle interaction with the Expert LLM
 def expert_llm(conversation_log):
-
     assigned_llm = session.get("assigned_expert_llm")
-
-    # Use the corresponding system prompt
-    system_prompt = PRAGMA_DIALECTICAL_EXPERT_PROMPT if assigned_llm == "pragma_dialectical" else GRAMMAR_EXPERT_PROMPT
-
+    system_prompt = (
+        PRAGMA_DIALECTICAL_EXPERT_PROMPT
+        if assigned_llm == "pragma_dialectical"
+        else GRAMMAR_EXPERT_PROMPT
+    )
     expert_prompt = f"""
     {system_prompt}
 
@@ -79,16 +79,13 @@ def expert_llm(conversation_log):
     try:
         response = client.chat.completions.create(
             model=expert_model,
-            messages=[
-                {"role": "system", "content": expert_prompt}
-            ]
+            messages=[{"role": "system", "content": expert_prompt}]
         )
         return response.choices[0].message.content
     except Exception as e:
         print(f"Error in Expert LLM: {e}")
         return "Error: Unable to get expert advice."
 
-# Function to handle interaction with the Conversational LLM
 def conversational_llm(prompt, expert_advice):
     assigned_llm = session.get("assigned_expert_llm")
     if assigned_llm == "pragma_dialectical":
@@ -114,7 +111,7 @@ def conversational_llm(prompt, expert_advice):
         If the user deviates too far from the topic at hand (discussion of the original policy topic presented), reintroduce it to preserve focus.
         Use as reference a data set of typical questions asked in a socratic dialogue.
         """
-    else:  # Grammar expert case
+    else:
         socratic_prompt = f"""
         Use the expert analysis to help the user format his argument grammatically.
         Focus on actionable implementation, and propose more grammatically correct, efficient, and concise ways to rephrase their statement.
@@ -125,8 +122,6 @@ def conversational_llm(prompt, expert_advice):
         DO NOT ASK QUESTIONS ON THE USERS STANCE, ONLY OFFER THE ADVICE LISTED ABOVE.
         Here is the expert analysis: "{expert_advice}"
         """
-
-
     try:
         response = client.chat.completions.create(
             model=conversational_model,
@@ -142,152 +137,201 @@ def conversational_llm(prompt, expert_advice):
 
 def upload_to_google_drive(filepath):
     try:
-        folder_id = "1GH4PumOc6teHoySALCaxZuCdCkrw67rI" 
+        folder_id = "1GH4PumOc6teHoySALCaxZuCdCkrw67rI"
         file_to_upload = drive.CreateFile({'title': os.path.basename(filepath), 'parents': [{'id': folder_id}]})
         file_to_upload.SetContentFile(filepath)
         file_to_upload.Upload()
         print(f"Uploaded {filepath} to Google Drive")
-        os.remove(filepath)  # Delete local file after upload
+        os.remove(filepath)
     except Exception as e:
         print(f"Error uploading to Google Drive: {e}")
 
 def save_conversation_log(conversation_log, prolific_id):
     try:
-        # Create a timestamped filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         assigned_expert_llm = session.get("assigned_expert_llm", "unknown_expert")
         filename = f"conversation_log_{assigned_expert_llm}_{prolific_id}_{timestamp}.txt"
 
-        # Include Prolific ID in the log content
         log_content = f"Prolific ID: {prolific_id}\n\n{conversation_log}"
-
-        # Save the conversation log to a local file
         with open(filename, "w") as f:
             f.write(log_content)
         
-        # Upload the file to Google Drive
         upload_to_google_drive(filename)
-        
         print(f"Conversation log saved and uploaded: {filename}")
     except Exception as e:
         print(f"Error saving conversation log: {e}")
 
 def save_arguments_log(user_arguments, prolific_id):
     try:
-        # Create a timestamped filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         assigned_expert_llm = session.get("assigned_expert_llm", "unknown_expert")
         filename = f"arguments_log_{assigned_expert_llm}_{prolific_id}_{timestamp}.txt"
 
-        # Include Prolific ID in the log content
         log_content = f"Prolific ID: {prolific_id}\n\n{user_arguments}"
-
-        # Save the user arguments to a local file
         with open(filename, "w") as f:
             f.write(log_content)
-        
-        # Upload the file to a specific folder in Google Drive
-        folder_id = "1X-wyzGN8sCMMUKwX-FliMeay5P9nzvLZ" 
+
+        folder_id = "1X-wyzGN8sCMMUKwX-FliMeay5P9nzvLZ"
         file_to_upload = drive.CreateFile({'title': os.path.basename(filename), 'parents': [{'id': folder_id}]})
         file_to_upload.SetContentFile(filename)
         file_to_upload.Upload()
         print(f"Arguments log uploaded: {filename}")
-        os.remove(filename)  # Delete local file after upload
+        os.remove(filename)
     except Exception as e:
         print(f"Error saving arguments log: {e}")
 
 
+app = Flask(__name__)
+app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev123')
+app.config['SESSION_TYPE'] = 'filesystem'
+Session(app)
+
 @app.route('/')
 def index():
-    if 'prolific_id' not in session:
-        session.clear()
-        session['conversation_log'] = ""
-        session['user_arguments'] = ""
-        session['round_count'] = 0
-        session['argument_count'] = 1
-        session['assigned_expert_llm'] = random.choice(["pragma_dialectical", "grammar"])
-        session['max_rounds'] = 5 if session['assigned_expert_llm'] == "pragma_dialectical" else 2  # Reduced rounds for grammar expert
-        session['post_study_response'] = False  # Control system for post-study response
+    # Do NOT clear session here if you want to preserve the ID if user refreshes
     return render_template('UI.html')
 
-
 @app.route('/prolific-id', methods=['POST'])
-def prolific_id():
-    prolific_id = request.json['prolific_id']
-    session['prolific_id'] = prolific_id
-    session['conversation_log'] = f"Prolific ID: {prolific_id}\n"
-    session['user_arguments'] = f"Prolific ID: {prolific_id}\n"
-    print(f"Prolific ID stored in session: {session['prolific_id']}")  # Debug statement
-    return jsonify({"status": "success", "next_prompt": "Please begin by typing your response to the prompt above (on the website header). Make sure to restate the question when responding (i.e. I oppose/support permitting individuals with mental illnesses to...)"})
+def store_prolific_id():
+    # Clear session once here so each new user starts fresh
+    session.clear()
 
+    # Basic session setup
+    session['conversation_log'] = ""
+    session['user_arguments'] = ""
+    session['round_count'] = 0
+    session['argument_count'] = 1
+    session['post_study_response'] = False
+
+    # Randomly assign: grammar vs pragma
+    session['assigned_expert_llm'] = random.choice(["pragma_dialectical", "grammar"])
+    if session['assigned_expert_llm'] == "grammar":
+        session['max_rounds'] = 1
+    else:
+        session['max_rounds'] = 5
+
+    # Store the actual Prolific ID
+    p_id = request.json['prolific_id']
+    session['prolific_id'] = p_id
+
+    # Update logs
+    session['conversation_log'] = f"Prolific ID: {p_id}\n"
+    session['user_arguments'] = f"Prolific ID: {p_id}\n"
+    print(f"[DEBUG] Storing Prolific ID: {p_id}, assigned: {session['assigned_expert_llm']}")
+
+    return jsonify({
+        "status": "success",
+        "next_prompt": (
+            "Please begin by typing your response to the prompt above (on the website header). "
+            "Make sure to restate the question when responding (e.g. I oppose/support permitting individuals with mental illnesses to...)"
+        )
+    })
 
 @app.route('/initial-argument', methods=['POST'])
 def initial_argument():
+    """User's first argument is handled here."""
     user_input = request.json['message']
     session['conversation_log'] += f"User: {user_input}\n"
     session['user_arguments'] += f"{session['argument_count']}. {user_input}\n"
     session['argument_count'] += 1
 
-    # Directly start the LLM conversation flow
-    expert_advice = expert_llm(session['conversation_log'])
-    session['conversation_log'] += f"Expert LLM: {expert_advice}\n"
+    # Expert advice
+    advice = expert_llm(session['conversation_log'])
+    session['conversation_log'] += f"Expert LLM: {advice}\n"
 
-    conversational_response = conversational_llm(user_input, expert_advice)
-    session['conversation_log'] += f"Conversational LLM: {conversational_response}\n\n"
-
+    # Single LLM reply
+    llm_reply = conversational_llm(user_input, advice)
+    session['conversation_log'] += f"Conversational LLM: {llm_reply}\n\n"
     session['round_count'] += 1
 
-    return jsonify({"message": conversational_response})
+    assigned = session['assigned_expert_llm']
+    print(f"[DEBUG] initial-argument => round_count={session['round_count']}, assigned={assigned}")
+
+    # If we've hit or exceeded max rounds => finalize
+    if session['round_count'] >= session['max_rounds']:
+        if assigned == "grammar":
+            # Grammar => always 1 round
+            session['post_study_response'] = True
+            return jsonify({
+                "message": llm_reply,
+                "system_prompt": (
+                    "To conclude, please write your final answer to the prompt question (on the website header): "
+                    "Do you support or oppose permitting individuals with mental illnesses to purchase firearms? "
+                    "Please elaborate on and explain your reasoning."
+                )
+            })
+        else:
+            # Pragma => if we already used up the single round or user jumped in
+            # SKIP showing the LLM reply in the final response:
+            session['post_study_response'] = True
+            return jsonify({
+                "message": "",  # <== blank out final LLM to avoid merging
+                "system_prompt": (
+                    "Thank you for participating in our study. "
+                    "To conclude, please respond to the prompt in the website header as best as you can."
+                )
+            })
+
+    # Otherwise, continue to multi-round (Pragma)
+    return jsonify({"message": llm_reply})
+
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    # Check if the user is in the post-study response phase (only for pragma-dialectical expert)
+    """Subsequent messages (Pragma only) or final answer if post_study_response==True."""
     if session.get('post_study_response', False):
-        user_response = request.json['message']
-        session['conversation_log'] += f"User Post-Study Response: {user_response}\n"
-        session['user_arguments'] += f"Final Response: {user_response}\n"
-        
-        # Retrieve Prolific ID from session
-        prolific_id = session.get("prolific_id", "unknown_id")
-        print(f"Prolific ID retrieved from session (post-study): {prolific_id}")  # Debug statement
+        # final user answer
+        final_msg = request.json['message']
+        pid = session.get('prolific_id', 'unknown_id')
+        print(f"[DEBUG] final-answer => ID is {pid}")
 
-        # Save final logs with Prolific ID
-        save_conversation_log(session['conversation_log'], prolific_id)
-        save_arguments_log(session['user_arguments'], prolific_id)
+        session['conversation_log'] += f"User (Final Answer): {final_msg}\n"
+        session['user_arguments'] += f"Final Response: {final_msg}\n"
 
-        # Clear session and return system message instead of LLM message
+        save_conversation_log(session['conversation_log'], pid)
+        save_arguments_log(session['user_arguments'], pid)
         session.clear()
-        return jsonify({"system_message": "Thank you for your response. The study is now complete. Your Prolific completion code is C7LJVS5U.", "end_study": True})
 
+        return jsonify({
+            "system_message": (
+                "Thank you for your response. The study is now complete. "
+                "Your Prolific completion code is C7LJVS5U."
+            ),
+            "end_study": True
+        })
+
+    # Must be pragma mid-flow
+    if session['assigned_expert_llm'] == "grammar":
+        # Shouldn't happen if grammar is only 1 round
+        return jsonify({"message": "Error: No further grammar messages expected."})
+
+    # If round_count + 1 >= max_rounds, skip the LLM, only show final system prompt
+    if session['round_count'] + 1 >= session['max_rounds']:
+        session['post_study_response'] = True
+        return jsonify({
+            "message": "",  # no new LLM
+            "system_prompt": (
+                "Thank you for participating in our study. "
+                "To conclude, please respond to the prompt in the website header as best as you can."
+            )
+        })
+
+    # If still under the max limit => produce next LLM message
     user_input = request.json['message']
     session['conversation_log'] += f"User: {user_input}\n"
     session['user_arguments'] += f"{session['argument_count']}. {user_input}\n"
     session['argument_count'] += 1
 
-    expert_advice = expert_llm(session['conversation_log'])
-    session['conversation_log'] += f"Expert LLM: {expert_advice}\n"
+    advice = expert_llm(session['conversation_log'])
+    session['conversation_log'] += f"Expert LLM: {advice}\n"
 
-    conversational_response = conversational_llm(user_input, expert_advice)
-    session['conversation_log'] += f"Conversational LLM: {conversational_response}\n\n"
-
+    llm_reply = conversational_llm(user_input, advice)
+    session['conversation_log'] += f"Conversational LLM: {llm_reply}\n\n"
     session['round_count'] += 1
 
-    # Check if this was the final round
-    if session['round_count'] >= session['max_rounds']:
-        prolific_id = session.get("prolific_id", "unknown_id")
-        print(f"Prolific ID retrieved from session (final round): {prolific_id}")  # Debug statement
-        if session['assigned_expert_llm'] == "grammar":
-            # For grammar expert, end the study after the second response
-            save_conversation_log(session['conversation_log'], prolific_id)
-            save_arguments_log(session['user_arguments'], prolific_id)
-            session.clear()
-            return jsonify({"system_message": "Thank you for your response. The study is now complete. Your Prolific completion code is C7LJVS5U.", "end_study": True})
-        else:
-            # For pragma-dialectical expert, proceed to post-study response
-            session['post_study_response'] = True
-            return jsonify({"message": "Thank you for participating in our study.", "system_prompt": "To conclude, please respond to the prompt in the website header as best as you can."})
+    return jsonify({"message": llm_reply})
 
-    return jsonify({"message": conversational_response})
 
 if __name__ == '__main__':
     app.run(debug=True)
+

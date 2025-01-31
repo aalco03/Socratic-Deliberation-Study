@@ -185,58 +185,100 @@
             addMessageToChat('User', userMessage, 'user', '/static/FinalUserIconPNG.png');
             chatInput.value = '';
 
+            // -------------------------
+            // Handle each conversation step
+            // -------------------------
+
             if (currentStep === 'prolific-id') {
+                // 1. Send Prolific ID
                 const response = await fetch('/prolific-id', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ prolific_id: userMessage })
                 });
-
                 const result = await response.json();
+
                 if (result.status === 'success') {
                     currentStep = 'initial-argument';
                     addMessageToChat('System', result.next_prompt, 'llm', '/static/SystemIconPNG.png');
                     chatInput.placeholder = "Present a political viewpoint...";
                 }
+
             } else if (currentStep === 'initial-argument') {
+                // 2. Initial argument => possible single LLM response (grammar) or multi-round start (pragma)
                 const response = await fetch('/initial-argument', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message: userMessage })
                 });
-
                 const result = await response.json();
+
+                // If there's a message from the LLM, show it
                 if (result.message) {
-                    currentStep = 'chat';
                     addMessageToChat('Bot-crates', result.message, 'llm', '/static/Bot-crates.png');
                 }
+
+                // If there's a system prompt, that means we are in the grammar route
+                // and the server wants the final answer next.
+                if (result.system_prompt) {
+                    addMessageToChat('System', result.system_prompt, 'llm', '/static/SystemIconPNG.png');
+                    // Now the next user submission is the final answer:
+                    currentStep = 'final-answer';
+                    chatInput.placeholder = "Write your final answer here...";
+                } else {
+                    // Otherwise, it's probably pragma-dialectical
+                    // and we move on to the multi-round 'chat' step:
+                    currentStep = 'chat';
+                    chatInput.placeholder = "Continue the dialogue...";
+                }
+
             } else if (currentStep === 'chat') {
+                // 3. Subsequent chat turns (pragma-dialectical only)
                 const response = await fetch('/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message: userMessage })
                 });
-
                 const result = await response.json();
 
-                // Show response from Conversational LLM
+                // Show the next LLM message (if any)
                 if (result.message) {
                     addMessageToChat('Bot-crates', result.message, 'llm', '/static/Bot-crates.png');
                 }
 
-                // Handle the final system message (instead of the LLM)
+                // If the server sends a final system_message, study ends
                 if (result.system_message) {
                     addMessageToChat('System', result.system_message, 'llm', '/static/SystemIconPNG.png');
                     chatInput.disabled = true;
                     chatButton.disabled = true;
                 }
 
-                // Handle the final system prompt
+                // If there's a system_prompt from the server, it might be concluding
                 if (result.system_prompt) {
                     addMessageToChat('System', result.system_prompt, 'llm', '/static/SystemIconPNG.png');
+                    // Next user message is final
+                    currentStep = 'final-answer';
+                    chatInput.placeholder = "Write your final answer here...";
+                }
+
+            } else if (currentStep === 'final-answer') {
+                // 4. Final answer step (especially for grammar expert)
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: userMessage })
+                });
+                const result = await response.json();
+
+                if (result.system_message) {
+                    addMessageToChat('System', result.system_message, 'llm', '/static/SystemIconPNG.png');
+                    // End study
+                    chatInput.disabled = true;
+                    chatButton.disabled = true;
                 }
             }
         });
-        </script>
+    </script>
 </body>
 </html>
+
