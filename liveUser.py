@@ -218,7 +218,7 @@ def prolific_id():
     session['conversation_log'] = f"Prolific ID: {prolific_id}\n"
     session['user_arguments'] = f"Prolific ID: {prolific_id}\n"
     print(f"Prolific ID stored in session: {session['prolific_id']}")  # Debug statement
-    return jsonify({"status": "success", "next_prompt": "Please begin by typing your response to the prompt above. Make sure to restate the question when responding (i.e. I oppose/support permitting individuals with mental illnesses to...)"})
+    return jsonify({"status": "success", "next_prompt": "Please begin by typing your response to the prompt above (on the website header). Make sure to restate the question when responding (i.e. I oppose/support permitting individuals with mental illnesses to...)"})
 
 
 @app.route('/initial-argument', methods=['POST'])
@@ -285,7 +285,7 @@ def chat():
         else:
             # For pragma-dialectical expert, proceed to post-study response
             session['post_study_response'] = True
-            return jsonify({"message": "Thank you for participating in our study.", "system_prompt": "To conclude, please respond to the prompt in the site header as best as you can."})
+            return jsonify({"message": "Thank you for participating in our study.", "system_prompt": "To conclude, please respond to the prompt in the website header as best as you can."})
 
     return jsonify({"message": conversational_response})
 
