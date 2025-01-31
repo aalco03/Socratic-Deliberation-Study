@@ -20,13 +20,33 @@
         .header h1 {
             font-size: 25px; /* Adjust this value to make it smaller */
         }       
+        .main-container {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 20px;
+            margin: 40px auto;
+            width: 80%;
+        }
+
         .chat-container {
             width: 60%;
-            margin: 40px auto;
             border: 2px solid #ccc;
             border-radius: 10px;
             background-color: white;
             padding: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .sidebar {
+            width: 30%;
+            padding: 15px;
+            border: 2px solid #ffcc00;
+            background-color: #fff8e1;
+            color: #333;
+            font-weight: bold;
+            text-align: center;
+            border-radius: 5px;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         }
         .chat-box {
@@ -90,6 +110,16 @@
             height: 50px;
             margin: 0 10px;
         }
+        .notice-box {
+            border: 2px solid #ffcc00;
+            background-color: #fff8e1;
+            color: #333;
+            padding: 10px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 15px;
+            border-radius: 5px;
+        }
     </style>
 </head>
 <body>
@@ -97,14 +127,20 @@
         <h1>Prompt: Do you support or oppose permitting individuals with mental illnesses to purchase firearms? Please elaborate on and explain your response.</h1>
     </div>
 
-    <div class="chat-container">
-        <div class="chat-box" id="chat-box">
-            <!-- Messages will appear here -->
+    <div class="main-container">
+        <div class="chat-container">
+            <div class="chat-box" id="chat-box">
+                <!-- Messages will appear here -->
+            </div>
+            <textarea id="chat-input" class="chat-input" placeholder="Type your Prolific ID..."></textarea>
+            <button id="chat-button" class="chat-button">Send</button>
         </div>
-        <textarea id="chat-input" class="chat-input" placeholder="Type your Prolific ID..."></textarea>
-        <button id="chat-button" class="chat-button">Send</button>
+    
+        <div class="sidebar">
+            <p>NOTE: Replies are very limited (between 1 - 5 responses). Please follow the system instructions and elaborate as much as possible.</p>
+        </div>
     </div>
-
+    
     <div class="footer">
         <img src="/static/StanfordDELLogoPNG.png" alt="Stanford DEL Logo">
         <img src="/static/StanfordHAILogoPNG.png" alt="Stanford HAI Logo">
