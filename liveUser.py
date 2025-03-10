@@ -295,7 +295,7 @@ def chat():
         return jsonify({
             "system_message": (
                 "Thank you for your response. The study is now complete. "
-                "Your Prolific completion code is C7LJVS5U."
+                "Your Prolific completion code is ********."
             ),
             "end_study": True
         })

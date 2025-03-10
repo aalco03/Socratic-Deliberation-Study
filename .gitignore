@@ -4,4 +4,8 @@ __pycache__/
 *.log
 deliberation_transcripts_ToulminModel/
 deliberation_transcripts_PDModel/
-
+deliberation_weight_test/
+deliberation_pragma-dialectical/
+deliberation_pragma-dialectic_argumentsOnly/
+deliberation_grammar_argumentsOnly/
+deliberation_grammar/
