@@ -2,11 +2,13 @@ from flask import Flask, render_template, request, jsonify, session
 from flask_session import Session
 from openai import OpenAI
 import os
+import json
 import random
 from datetime import datetime
 from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
 from pydrive2.auth import ServiceAccountCredentials
+from oauth2client.service_account import ServiceAccountCredentials
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -52,10 +54,15 @@ GRAMMAR_EXPERT_PROMPT = """
 """
 
 def setup_google_drive():
-    service_account_file = "socraticDeliberationServiceKey.json"
+    service_key_json = os.environ.get("SERVICE_KEY_JSON")
+    if not service_key_json:
+        raise ValueError("SERVICE_KEY_JSON environment variable is not set")
+    
+    key_dict = json.loads(service_key_json)
+    
     gauth = GoogleAuth()
-    gauth.credentials = ServiceAccountCredentials.from_json_keyfile_name(
-        service_account_file,
+    gauth.credentials = ServiceAccountCredentials.from_json_keyfile_dict(
+        key_dict,
         scopes=["https://www.googleapis.com/auth/drive"]
     )
     drive = GoogleDrive(gauth)
