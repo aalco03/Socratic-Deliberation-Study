@@ -11,3 +11,4 @@ deliberation_grammar_argumentsOnly/
 deliberation_grammar/
 .env
 socraticDeliberationServiceKey.json
+key.txt
